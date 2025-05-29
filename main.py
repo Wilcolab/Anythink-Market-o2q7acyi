@@ -10,6 +10,7 @@ from pathlib import Path
 import uuid
 import uvicorn
 import numpy as np
+import random
 
 # Get the base directory using the current file's location
 BASE_DIR = Path(__file__).resolve().parent
@@ -40,7 +41,10 @@ FILTERS = {
     "contrast": "Increase contrast",
     "invert": "Invert colors",
     "sepia": "Sepia tone effect",
-    "vignette": "Vignette (darken corners)"
+    "vignette": "Vignette (darken corners)",
+    "black_white": "Black & White (binary)",
+    "vintage": "Vintage effect",
+    "glitch": "Glitch effect"
 }
 
 @app.get("/", response_class=HTMLResponse)
@@ -124,6 +128,12 @@ async def api_apply_filter(
     # Apply the selected filter
     if selected_filter == "grayscale":
         filtered_img = img.convert("L").convert("RGB")
+    elif selected_filter == "black_white":
+        # Convert to grayscale, then to black and white using a threshold
+        bw_img = img.convert("L")
+        threshold = 128
+        bw_img = bw_img.point(lambda x: 255 if x > threshold else 0, mode='1')
+        filtered_img = bw_img.convert("RGB")
     elif selected_filter == "blur":
         filtered_img = img.filter(ImageFilter.BLUR)
     elif selected_filter == "contour":
@@ -188,6 +198,32 @@ async def api_apply_filter(
         black_img = Image.new('RGB', (width, height), (0, 0, 0))
         # Blend original with black using mask
         filtered_img = Image.composite(img, black_img, mask_img)
+    elif selected_filter == "vintage":
+        # Convert to RGB if not already
+        vintage_img = img.convert("RGB")
+        # Apply a warm color overlay
+        overlay = Image.new('RGB', vintage_img.size, (230, 179, 120))
+        blended = Image.blend(vintage_img, overlay, alpha=0.25)
+        # Reduce contrast
+        enhancer = ImageEnhance.Contrast(blended)
+        filtered_img = enhancer.enhance(0.85)
+    elif selected_filter == "glitch":
+        # Simple glitch: shift color channels horizontally by random offsets
+        r, g, b = img.split()
+        width, height = img.size
+        # Randomly shift each channel
+        def shift_channel(channel):
+            offset = random.randint(-5, 5)
+            return channel.transform(
+                (width, height),
+                Image.AFFINE,
+                (1, 0, offset, 0, 1, 0),
+                resample=Image.BICUBIC
+            )
+        r_shifted = shift_channel(r)
+        g_shifted = shift_channel(g)
+        b_shifted = shift_channel(b)
+        filtered_img = Image.merge("RGB", (r_shifted, g_shifted, b_shifted))
     else:
         # No filter or unknown filter
         filtered_img = img
