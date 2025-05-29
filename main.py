@@ -2,13 +2,14 @@ from fastapi import FastAPI, File, UploadFile, Request, Form
 from fastapi.responses import HTMLResponse, Response, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.templating import Jinja2Templates
-from PIL import Image, ImageFilter, ImageEnhance
+from PIL import Image, ImageFilter, ImageEnhance, ImageOps
 import io
 import os
 import base64
 from pathlib import Path
 import uuid
 import uvicorn
+import numpy as np
 
 # Get the base directory using the current file's location
 BASE_DIR = Path(__file__).resolve().parent
@@ -38,7 +39,8 @@ FILTERS = {
     "brightness": "Increase brightness",
     "contrast": "Increase contrast",
     "invert": "Invert colors",
-    "sepia": "Sepia tone effect"
+    "sepia": "Sepia tone effect",
+    "vignette": "Vignette (darken corners)"
 }
 
 @app.get("/", response_class=HTMLResponse)
@@ -143,21 +145,7 @@ async def api_apply_filter(
         enhancer = ImageEnhance.Contrast(img)
         filtered_img = enhancer.enhance(1.5)
     elif selected_filter == "invert":
-        rgb_img = img.convert('RGB')
-        width, height = rgb_img.size
-        pixels = rgb_img.load()
-        
-        for py in range(height):
-            for px in range(width):
-                r, g, b = rgb_img.getpixel((px, py))
-                
-                tr = 25 - r
-                tg = 25 - g
-                tb = 25 - b
-                
-                pixels[px, py] = (tr, tg, tb)
-        
-        filtered_img = rgb_img
+        filtered_img = ImageOps.invert(img.convert('RGB'))
     elif selected_filter == "sepia":
         # Convert to RGB mode if it's not already
         rgb_img = img.convert('RGB')
@@ -183,6 +171,23 @@ async def api_apply_filter(
                 pixels[px, py] = (tr, tg, tb)
         
         filtered_img = rgb_img
+    elif selected_filter == "vignette":
+        # Create vignette mask using a radial gradient
+        width, height = img.size
+        # Create coordinate grid
+        x = np.linspace(-1, 1, width)
+        y = np.linspace(-1, 1, height)
+        xx, yy = np.meshgrid(x, y)
+        # Calculate distance from center
+        radius = np.sqrt(xx**2 + yy**2)
+        # Create mask: 1 at center, fades to 0.5 at edges
+        mask = 1 - 0.5 * np.clip(radius, 0, 1)
+        # Convert mask to 8-bit
+        mask_img = Image.fromarray(np.uint8(mask * 255), mode='L').resize((width, height))
+        # Create black image for blending
+        black_img = Image.new('RGB', (width, height), (0, 0, 0))
+        # Blend original with black using mask
+        filtered_img = Image.composite(img, black_img, mask_img)
     else:
         # No filter or unknown filter
         filtered_img = img
