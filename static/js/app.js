@@ -3,6 +3,7 @@ document.addEventListener("DOMContentLoaded", function () {
   const fileInput = document.getElementById("image-upload");
   const fileLabel = document.querySelector(".file-label");
   const previewContainer = document.getElementById("preview-container");
+  const fileInputContainer = document.querySelector('.file-input-container');
 
   if (fileInput) {
     fileInput.addEventListener("change", function () {
@@ -34,6 +35,38 @@ document.addEventListener("DOMContentLoaded", function () {
         if (form) {
           form.submit();
         }
+      }
+    });
+  }
+
+  if (fileInputContainer && fileInput) {
+    // Highlight drop area on dragover/dragenter
+    ['dragenter', 'dragover'].forEach(eventName => {
+      fileInputContainer.addEventListener(eventName, function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        fileInputContainer.classList.add('dragover');
+      });
+    });
+
+    // Remove highlight on dragleave/drop
+    ['dragleave', 'drop'].forEach(eventName => {
+      fileInputContainer.addEventListener(eventName, function (e) {
+        e.preventDefault();
+        e.stopPropagation();
+        fileInputContainer.classList.remove('dragover');
+      });
+    });
+
+    // Handle dropped files
+    fileInputContainer.addEventListener('drop', function (e) {
+      e.preventDefault();
+      e.stopPropagation();
+      if (e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files.length > 0) {
+        fileInput.files = e.dataTransfer.files;
+        // Trigger change event for preview and auto-submit
+        const event = new Event('change', { bubbles: true });
+        fileInput.dispatchEvent(event);
       }
     });
   }
