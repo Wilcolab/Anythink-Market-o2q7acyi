@@ -233,4 +233,9 @@ body {
   to {
     transform: rotate(360deg);
   }
+}
+
+.file-input-container.dragover {
+  border-color: var(--primary-color);
+  background-color: rgba(99, 102, 241, 0.05);
 } 
